@@ -49,9 +49,26 @@ def run_analysis(product_name,reviews):
     for text,analysis in zip(reviews,analyses): db.save_review_result(pid,text,analysis)
     stored=db.get_reviews_for_product(pid)
     data=aggregator.build_dashboard_data(db.get_product(pid),stored)
-    summary=ai_service.generate_summary(stored,data['sentiment_distribution'],data['top_positive_features'],data['top_negative_features'])
+    summary=ai_service.generate_summary(
+    stored,
+    data['sentiment_distribution'],
+    data['top_positive_features'],
+    data['top_negative_features']
+    )
+
+    recommendation=ai_service.generate_product_recommendation(
+    stored,
+    data['top_positive_features'],
+    data['top_negative_features']
+    )
+
     db.save_product_summary(pid,summary)
-    data['summary']=summary; data['product']['summary']=summary
+
+    data['summary']=summary
+    data['recommendation']=recommendation
+    data['product']['summary']=summary
+    data['product']['recommendation']=recommendation
+
     return data
 
 @app.post('/analyze/text')

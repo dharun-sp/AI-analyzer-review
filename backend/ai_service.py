@@ -111,3 +111,78 @@ Do not use markdown.'''
     except Exception as exc:
         print(f'WARNING: Gemini summary failed; using local summary. Reason: {exc}')
         return _local_summary(sentiment_counts,top_positive,top_negative,len(reviews))
+def generate_product_recommendation(reviews, top_positive, top_negative):
+    if not reviews:
+        return 'No recommendation available because no reviews were analyzed.'
+
+    if not client:
+        if top_negative:
+            features = ', '.join(
+                x.get('feature', '') for x in top_negative[:3]
+                if x.get('feature')
+            )
+            if features:
+                return f'Consider improving the product in these areas: {features}.'
+        return 'Customers generally appear satisfied. Continue improving the features customers value most.'
+
+    prompt = f'''Based on the customer reviews and their most common praised and complained-about features,
+provide one concise product recommendation.
+
+Top praised features: {top_positive}
+Top complained-about features: {top_negative}
+Total reviews: {len(reviews)}
+
+The recommendation should:
+- Focus on the most important customer needs.
+- Suggest a practical product improvement or direction.
+- Be specific rather than generic.
+- Be 1-2 sentences.
+- Do not use markdown.
+'''
+
+    try:
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.2
+                    )
+                )
+
+                text = (getattr(response, 'text', '') or '').strip()
+
+                if text:
+                    return text
+
+                raise ValueError('Empty Gemini recommendation')
+
+            except Exception:
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_BASE_SECONDS * (2 ** attempt))
+                else:
+                    raise
+
+    except Exception as exc:
+        print(
+            f'WARNING: Gemini product recommendation failed; '
+            f'using local recommendation. Reason: {exc}'
+        )
+
+        if top_negative:
+            features = ', '.join(
+                x.get('feature', '') for x in top_negative[:3]
+                if x.get('feature')
+            )
+
+            if features:
+                return (
+                    f'Consider improving the product in these areas: '
+                    f'{features}.'
+                )
+
+        return (
+            'Customers generally appear satisfied. Continue improving '
+            'the features customers value most.'
+        )
